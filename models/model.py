@@ -74,6 +74,10 @@ class DFNet(nn.Module):
             name_data = "KVR/"
         elif args['dataset'] == 'woz':
             name_data = "WOZ/"
+        elif args['dataset'] == 'risa':
+            name_data = "RISA/"
+        elif args['dataset'] == 'cross':
+            name_data = "CROSS/"
         layer_info = str(self.n_layers)
         directory = 'save/DF-Net-' + args["addName"] + name_data + 'HDD' + str(
             self.hidden_size) + 'BSZ' + str(args['batch']) + 'DR' + str(self.dropout) + 'L' + layer_info + 'lr' + str(
@@ -223,6 +227,12 @@ class DFNet(nn.Module):
             TP_restaurant, FP_restaurant, FN_restaurant = 0, 0, 0
             TP_attraction, FP_attraction, FN_attraction = 0, 0, 0
             TP_hotel, FP_hotel, FN_hotel = 0, 0, 0
+        elif args['dataset'] == 'risa':
+            F1_pred, F1_count = 0, 0
+            TP_all, FP_all, FN_all = 0, 0, 0
+        elif args['dataset'] == 'cross':
+            F1_pred, F1_count = 0, 0
+            TP_all, FP_all, FN_all = 0, 0, 0
 
         pbar = tqdm(enumerate(dev), total=len(dev))
 
@@ -230,27 +240,32 @@ class DFNet(nn.Module):
             entity_path = 'data/KVR/kvret_entities.json'
         elif args['dataset'] == 'woz':
             entity_path = 'data/MULTIWOZ2.1/global_entities.json'
+        elif args['dataset'] == 'risa':
+            entity_path = 'data/RiSAWOZ/ontology_2.0.json'
+        elif args['dataset'] == 'cross':
+            entity_path = 'data/CrossWOZ/database/'
         else:
             print('dataset args error')
             exit(1)
 
-        with open(entity_path) as f:
-            global_entity = json.load(f)
+        if args['dataset'] == 'cross':
+            attraction_entity = get_domain_entities(entity_path + "attraction_db.json")
+            hotel_entity = get_domain_entities(entity_path + "hotel_db.json")
+            metro_entity = get_domain_entities(entity_path + "metro_db.json")
+            res_entity = get_domain_entities(entity_path + "restaurant_db.json")
+            taxi_entity = get_domain_entities(entity_path + "taxi_db.json")
             global_entity_type = {}
-            global_entity_list = []
-            for key in global_entity.keys():
-                if key != 'poi':
-                    entity_arr = [item.lower().replace(' ', '_') for item in global_entity[key]]
-                    global_entity_list += entity_arr
-                    for entity in entity_arr:
-                        global_entity_type[entity] = key
-                else:
-                    for item in global_entity['poi']:
-                        entity_arr = [item[k].lower().replace(' ', '_') for k in item.keys()]
-                        global_entity_list += entity_arr
-                        for key in item:
-                            global_entity_type[item[key].lower().replace(' ', '_')] = key
-            global_entity_list = list(set(global_entity_list))
+            global_entity_list = list(set(attraction_entity + hotel_entity + metro_entity + res_entity + taxi_entity))
+        else:
+            with open(entity_path, encoding='utf8') as f:
+                global_entity = json.load(f)
+                global_entity_type = {}
+                global_entity_list = []
+                for key in global_entity.keys():
+                    key_dict = global_entity[key]
+                    for attribute in key_dict.keys():
+                        global_entity_list += [it for it in key_dict[attribute]]
+                global_entity_list = list(set(global_entity_list))
 
         for j, data_dev in pbar:
             ids.extend(data_dev['id'])
@@ -366,10 +381,29 @@ class DFNet(nn.Module):
                     TP_hotel += single_tp
                     FP_hotel += single_fp
                     FN_hotel += single_fn
-
+                elif args['dataset'] == 'risa':
+                    single_tp, single_fp, single_fn, single_f1, count = self.compute_prf(data_dev['ent_index'][bi],
+                                                                                         pred_sent.split(),
+                                                                                         global_entity_list,
+                                                                                         data_dev['kb_arr_plain'][bi])
+                    F1_pred += single_f1
+                    F1_count += count
+                    TP_all += single_tp
+                    FP_all += single_fp
+                    FN_all += single_fn
+                elif args['dataset'] == 'cross':
+                    single_tp, single_fp, single_fn, single_f1, count = self.compute_prf(data_dev['ent_index'][bi],
+                                                                                         pred_sent.split(),
+                                                                                         global_entity_list,
+                                                                                         data_dev['kb_arr_plain'][bi])
+                    F1_pred += single_f1
+                    F1_count += count
+                    TP_all += single_tp
+                    FP_all += single_fp
+                    FN_all += single_fn
                 # compute Per-response Accuracy Score
                 total += 1
-                if (gold_sent == pred_sent):
+                if gold_sent == pred_sent:
                     acc += 1
 
                 if args['genSample']:
@@ -431,6 +465,24 @@ class DFNet(nn.Module):
             print("F1-micro-restaurant SCORE:\t{}".format(self.compute_F1(P_restaurant_score, R_restaurant_score)))
             print("F1-micro-attraction SCORE:\t{}".format(self.compute_F1(P_attraction_score, R_attraction_score)))
             print("F1-micro-hotel SCORE:\t{}".format(self.compute_F1(P_hotel_score, R_hotel_score)))
+        elif args['dataset'] == 'risa':
+            print("BLEU SCORE:\t" + str(bleu_score))
+            print("F1-macro SCORE:\t{}".format(F1_pred / float(F1_count)))
+
+            P_score = TP_all / float(TP_all + FP_all) if (TP_all + FP_all) != 0 else 0
+            R_score = TP_all / float(TP_all + FN_all) if (TP_all + FN_all) != 0 else 0
+
+            F1_score = self.compute_F1(P_score, R_score)
+            print("F1-micro SCORE:\t{}".format(F1_score))
+        elif args['dataset'] == 'cross':
+            print("BLEU SCORE:\t" + str(bleu_score))
+            print("F1-macro SCORE:\t{}".format(F1_pred / float(F1_count)))
+
+            P_score = TP_all / float(TP_all + FP_all) if (TP_all + FP_all) != 0 else 0
+            R_score = TP_all / float(TP_all + FN_all) if (TP_all + FN_all) != 0 else 0
+
+            F1_score = self.compute_F1(P_score, R_score)
+            print("F1-micro SCORE:\t{}".format(F1_score))
 
         if output:
             print('Test Finish!')
@@ -463,6 +515,16 @@ class DFNet(nn.Module):
                         self.compute_F1(P_attraction_score, R_attraction_score)),
                         file=f)
                     print("F1-micro-hotel SCORE:\t{}".format(self.compute_F1(P_hotel_score, R_hotel_score)), file=f)
+                elif args['dataset'] == 'risa':
+                    print("ACC SCORE:\t" + str(acc_score), file=f)
+                    print("BLEU SCORE:\t" + str(bleu_score), file=f)
+                    print("F1-macro SCORE:\t{}".format(F1_pred / float(F1_count)), file=f)
+                    print("F1-micro SCORE:\t{}".format(self.compute_F1(P_score, R_score)), file=f)
+                elif args['dataset'] == 'cross':
+                    print("ACC SCORE:\t" + str(acc_score), file=f)
+                    print("BLEU SCORE:\t" + str(bleu_score), file=f)
+                    print("F1-macro SCORE:\t{}".format(F1_pred / float(F1_count)), file=f)
+                    print("F1-micro SCORE:\t{}".format(self.compute_F1(P_score, R_score)), file=f)
 
         if (early_stop == 'BLEU'):
             if (bleu_score >= matric_best):
@@ -525,3 +587,17 @@ class DFNet(nn.Module):
         print('Final System Response : ', pred_sent)
         print('Gold System Response : ', gold_sent)
         print('\n')
+
+
+def get_domain_entities(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        domain_entity = json.load(f)
+        domain_entity_list = []
+        for subject in domain_entity:
+            key_dict = subject[1]
+            for attri in key_dict.keys():
+                if isinstance(key_dict[attri], list):
+                    domain_entity_list += key_dict[attri]
+                else:
+                    domain_entity_list.append(str(key_dict[attri]))
+    return list(set(domain_entity_list))

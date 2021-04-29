@@ -15,7 +15,10 @@ if args['dataset'] == 'kvr':
     domains = {'navigate': 0, 'weather': 1, 'schedule': 2}
 elif args['dataset'] == 'woz':
     domains = {'restaurant': 0, 'attraction': 1, 'hotel': 2}
-
+elif args['dataset'] == 'risa':
+    domains = {"全部": 0, "旅游景点": 1, "餐厅": 2, "酒店": 3, "火车": 4, "飞机": 5, "天气": 6, "电影": 7, "电视剧": 8}
+elif args['dataset'] == 'cross':
+    domains = {"全部": 0, "景点": 1, "餐馆": 2, "酒店": 3, "地铁": 4, "出租": 5}
 
 class Lang:
     def __init__(self):

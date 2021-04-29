@@ -9,9 +9,12 @@ UNK_token = 0
 
 parser = argparse.ArgumentParser(description='DF-Net')
 
-parser.add_argument('-ds', '--dataset', help='dataset, kvr or woz', required=False, default='kvr')
+parser.add_argument('-ds', '--dataset', help='dataset, risa or cross', required=False, default='cross')
+# use for fast_test
+parser.add_argument('-fs', '--fast_test', action='store_true', help='use for load dev as train, to check bug',
+                    default=False)
 parser.add_argument('-e', '--epoch', help='epoch num', required=False, type=int, default=1000)
-parser.add_argument('-fixed', '--fixed', help='fix seeds', required=False, default=False)
+parser.add_argument('-fixed', '--fixed', help='fix seeds', required=False, default=True)
 parser.add_argument('-random_seed', '--random_seed', help='random_seed', required=False, default=1234)
 parser.add_argument('-em_dim', '--embeddings_dim', help='word embeddings dim', type=int, required=False, default=128)
 parser.add_argument('-hdd', '--hidden', help='Hidden size', required=False, default=128)
@@ -43,4 +46,4 @@ USE_CUDA = args['gpu']
 print("USE_CUDA: " + str(USE_CUDA))
 
 LIMIT = int(args["limit"])
-MEM_TOKEN_SIZE = 6 if args["dataset"] == 'kvr' else 12
+MEM_TOKEN_SIZE = 4

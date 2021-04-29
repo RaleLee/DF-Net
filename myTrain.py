@@ -20,13 +20,19 @@ if args['dataset'] == 'kvr':
 elif args['dataset'] == 'woz':
     from utils.utils_Ent_woz import *
     domains = {'restaurant': 0, 'attraction': 1, 'hotel': 2}
+elif args['dataset'] == 'risa':
+    from utils.utils_Ent_risa import *
+    domains = {"全部": 0, "旅游景点": 1, "餐厅": 2, "酒店": 3, "火车": 4, "飞机": 5, "天气": 6, "电影": 7, "电视剧": 8}
+elif args['dataset'] == 'cross':
+    from utils.utils_Ent_cross import *
+    domains = {"全部": 0, "景点": 1, "餐馆": 2, "酒店": 3, "地铁": 4, "出租": 5}
 else:
     print("[ERROR] You need to provide the correct --dataset information")
 
 # Configure models and load data
 if args['epoch'] > 0:
     avg_best, cnt, res = 0.0, 0, 0.0
-    train, dev, test, testOOV, lang, max_resp_len = prepare_data_seq(batch_size=int(args['batch']))
+    train, dev, test, testOOV, lang, max_resp_len = prepare_data_seq(batch_size=int(args['batch']), fast_test=args['fast_test'])
     model = globals()['DFNet'](
         int(args['hidden']),
         lang,
@@ -57,7 +63,7 @@ if args['epoch'] > 0:
                 break
 
 # Testing
-train, dev, test, testOOV, lang, max_resp_len = prepare_data_seq(batch_size=int(args['batch']))
+train, dev, test, testOOV, lang, max_resp_len = prepare_data_seq(batch_size=int(args['batch']), fast_test=args['fast_test'])
 
 model = globals()['DFNet'](
     int(args['hidden']),
